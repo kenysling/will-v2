@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowRight, Check, Scale } from "lucide-react";
+import { ArrowRight, Check, Play } from "lucide-react";
 import { MEMBERSHIP_PLANS, PLAN_ORDER } from "../data/plans";
 import { AppView, BillingCycle, MembershipTierId } from "../types/estate";
 
@@ -10,7 +10,14 @@ interface OverviewPageProps {
   onLoadSampleAndOpenBuilder: () => void;
 }
 
-const HERO_IMAGE = "/src/assets/images/hero_singapore_estate_1795157604942.jpg";
+const YOUTUBE_VIDEO_ID = "Y1g7mebf4tE";
+const YOUTUBE_EMBED_URL =
+  "https://www.youtube.com/embed/Y1g7mebf4tE?si=ceqGBlPbMscE80h3&autoplay=1";
+const THUMBNAIL_SOURCES = [
+  `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`,
+  `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/hqdefault.jpg`,
+  "/src/assets/images/hero_singapore_estate_1795157604942.jpg",
+];
 
 const CORE_PLAN_POINTS: Record<MembershipTierId, string[]> = {
   essential: [
@@ -37,7 +44,8 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   onLoadSampleAndOpenBuilder,
 }) => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("annual");
-  const [heroImgErr, setHeroImgErr] = useState(false);
+  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  const [thumbIndex, setThumbIndex] = useState(0);
 
   return (
     <div className="bg-[#F8F9FA]">
@@ -81,23 +89,49 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             </div>
           </div>
 
-          <div className="lg:col-span-6">
-            <div className="h-full min-h-[300px] lg:min-h-[400px] rounded-lg overflow-hidden border border-[#E2E8F0] bg-[#E8ECEA]">
-              {!heroImgErr ? (
-                <img
-                  src={HERO_IMAGE}
-                  alt="Private wealth study overlooking the Singapore skyline with formal legal folio"
-                  referrerPolicy="no-referrer"
-                  onError={() => setHeroImgErr(true)}
-                  className="w-full h-full object-cover"
+          <div className="lg:col-span-6 flex items-center">
+            <div className="w-full aspect-video rounded-lg overflow-hidden border border-[#E2E8F0] bg-[#111827] relative shadow-sm">
+              {isPlayingVideo ? (
+                <iframe
+                  className="w-full h-full"
+                  src={YOUTUBE_EMBED_URL}
+                  title="YouTube video player"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gradient-to-br from-[#EDF2EF] to-[#DCE4DF]">
-                  <Scale className="w-9 h-9 text-[#0F4C3A] mb-2" />
-                  <p className="font-display text-lg font-semibold text-[#111827]">
-                    Singapore Estate Workspace
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPlayingVideo(true)}
+                  aria-label="Play estate planning overview video"
+                  className="w-full h-full relative block group cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F4C3A]"
+                >
+                  <img
+                    src={THUMBNAIL_SOURCES[thumbIndex]}
+                    alt="Video preview thumbnail for Singapore Will Planning Overview"
+                    referrerPolicy="no-referrer"
+                    onError={() => {
+                      if (thumbIndex < THUMBNAIL_SOURCES.length - 1) {
+                        setThumbIndex((i) => i + 1);
+                      }
+                    }}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10 transition-opacity duration-200 group-hover:via-black/20"
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6">
+                    <span className="w-16 h-16 rounded-full bg-white text-[#111827] group-hover:bg-[#1D4ED8] group-hover:text-white flex items-center justify-center shadow-lg transition-colors duration-150">
+                      <Play className="w-6 h-6 fill-current ml-0.5" />
+                    </span>
+                    <span className="text-sm font-medium text-white tracking-tight">
+                      Watch Video Overview
+                    </span>
+                  </div>
+                </button>
               )}
             </div>
           </div>
