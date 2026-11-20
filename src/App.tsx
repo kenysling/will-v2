@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { variant, track, consent, setConsent, loadClarity, type Variant } from "./pt";
 import { AssetVault } from "./components/AssetVault";
 import { EstateCounsel } from "./components/EstateCounsel";
 import { MembershipPage } from "./components/MembershipPage";
@@ -71,6 +72,13 @@ function loadInitialState(): PersistedState {
 export default function App() {
   const initial = loadInitialState();
 
+  // Read A/B variant once when the screen first renders
+  const [abVariant] = useState<Variant>(() => variant());
+  const [consentChoice, setConsentChoice] = useState<"granted" | "denied" | null>(() =>
+    consent()
+  );
+  const hasTrackedScreenView = useRef(false);
+
   const [activeView, setActiveView] = useState<AppView>("overview");
   const [subscription, setSubscription] = useState<SubscriptionState>(initial.subscription);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(initial.invoices);
@@ -95,8 +103,16 @@ export default function App() {
     cycle: "annual",
   });
 
-  // Subtle status toast on plan change
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // On app start: load Clarity if consent is already granted, and record screen_view once
+  useEffect(() => {
+    if (consent() === "granted") {
+      loadClarity();
+    }
+    if (!hasTrackedScreenView.current) {
+      hasTrackedScreenView.current = true;
+      track("screen_view");
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -123,11 +139,23 @@ export default function App() {
     counselMessages,
   ]);
 
-  useEffect(() => {
-    if (!toastMessage) return;
-    const timer = setTimeout(() => setToastMessage(null), 4500);
-    return () => clearTimeout(timer);
-  }, [toastMessage]);
+  const navigateTo = (view: AppView) => {
+    if (view === "builder" && activeView !== "builder") {
+      track("goal_complete");
+    }
+    setActiveView(view);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleMainCtaClick = () => {
+    track("cta_click");
+    navigateTo("builder");
+  };
+
+  const handleConsentChoice = (choice: "granted" | "denied") => {
+    setConsent(choice);
+    setConsentChoice(choice);
+  };
 
   const openCheckoutModal = (tierId: MembershipTierId, cycle: BillingCycle) => {
     setCheckoutModal({ open: true, tierId, cycle });
@@ -204,11 +232,6 @@ export default function App() {
 
     setInvoices((prev) => [newInvoice, ...prev]);
     setCheckoutModal((prev) => ({ ...prev, open: false }));
-    setToastMessage(
-      isTrial
-        ? `14-day free trial of ${plan.name} activated (S$0 today).`
-        : `${plan.name} membership is now active.`
-    );
   };
 
   const handleBookSolicitorReview = () => {
@@ -247,7 +270,6 @@ export default function App() {
     };
 
     setInvoices((prev) => [newInvoice, ...prev]);
-    setToastMessage("Singapore Solicitor Draft Review scheduled.");
   };
 
   const handleAddAsset = (assetInput: Omit<VaultAsset, "id" | "lastVerified">) => {
@@ -270,13 +292,13 @@ export default function App() {
 
   const handlePrimaryHeaderAction = () => {
     if (activeView === "overview") {
-      setActiveView("builder");
+      navigateTo("builder");
       return;
     }
     if (subscription.tierId === "essential") {
       openCheckoutModal("family_guard", "annual");
     } else {
-      setActiveView("membership");
+      navigateTo("membership");
     }
   };
 
@@ -287,46 +309,29 @@ export default function App() {
       includeMirrorWill: plan.limits.includesMirrorWill,
       enableTestamentaryTrust: plan.limits.includesTestamentaryTrust,
     });
-    setActiveView("builder");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigateTo("builder");
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-[#111827]">
+    <div
+      className={`min-h-screen flex flex-col bg-[#F8F9FA] text-[#111827] ${
+        consentChoice === null ? "pb-28 sm:pb-20" : ""
+      }`}
+    >
       <TopBar
         activeView={activeView}
-        onNavigate={(view) => {
-          setActiveView(view);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
+        onNavigate={navigateTo}
         currentTier={subscription.tierId}
         onPrimaryAction={handlePrimaryHeaderAction}
       />
-
-      {toastMessage && (
-        <div
-          role="status"
-          className="no-print fixed bottom-6 right-6 z-50 bg-[#111827] text-white px-5 py-3 rounded-md shadow-lg text-xs font-medium flex items-center gap-4"
-        >
-          <span>{toastMessage}</span>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="text-white/70 hover:text-white cursor-pointer"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
 
       <main className="flex-1">
         {activeView === "overview" && (
           <OverviewPage
             currentTierId={subscription.tierId}
-            onNavigate={(view) => {
-              setActiveView(view);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
+            showVideo={abVariant === "B"}
+            onMainCtaClick={handleMainCtaClick}
+            onNavigate={navigateTo}
             onSelectPlan={openCheckoutModal}
             onLoadSampleAndOpenBuilder={handleLoadSampleAndOpenBuilder}
           />
@@ -399,6 +404,38 @@ export default function App() {
         onClose={() => setCheckoutModal((prev) => ({ ...prev, open: false }))}
         onConfirmSubscription={handleConfirmSubscription}
       />
+
+      {/* Bottom Consent Notice — shown until the visitor chooses Accept or Decline */}
+      {consentChoice === null && (
+        <div
+          role="region"
+          aria-label="Analytics consent notice"
+          className="no-print fixed bottom-0 inset-x-0 z-50 bg-white border-t border-[#CBD5E1] shadow-lg"
+        >
+          <div className="max-w-[1400px] mx-auto px-6 lg:px-10 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <p className="text-xs sm:text-sm text-[#334155] leading-relaxed max-w-3xl">
+              This class prototype records which version you saw and what you pressed, to test a
+              design. Nothing about your visit leaves this browser unless you agree.
+            </p>
+            <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => handleConsentChoice("granted")}
+                className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 text-sm font-medium bg-[#111827] hover:bg-[#334155] text-white rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConsentChoice("denied")}
+                className="flex-1 sm:flex-none sm:w-28 py-2.5 px-4 text-sm font-medium bg-[#111827] hover:bg-[#334155] text-white rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

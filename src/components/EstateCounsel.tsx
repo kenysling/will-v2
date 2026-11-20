@@ -9,6 +9,7 @@ import {
   WillProfile,
 } from "../types/estate";
 import { MarkdownText } from "./MarkdownText";
+import { answerEstateQuestionClient } from "../utils/clientEstateEngine";
 
 interface EstateCounselProps {
   messages: CounselMessage[];
@@ -43,7 +44,7 @@ export const EstateCounsel: React.FC<EstateCounselProps> = ({
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const sendQuestion = async (questionText: string) => {
+  const sendQuestion = (questionText: string) => {
     const trimmed = questionText.trim();
     if (!trimmed || isLoading) return;
 
@@ -63,44 +64,23 @@ export const EstateCounsel: React.FC<EstateCounselProps> = ({
       timestamp: nowLabel,
     };
 
-    const nextHistory = [...messages, userMsg];
-    onAddMessages([userMsg]);
     setInput("");
     setIsLoading(true);
+    const hasProfileData = Boolean(willProfile.fullName.trim());
+    const replyText = answerEstateQuestionClient(
+      trimmed,
+      includeProfileContext && hasProfileData ? willProfile : null
+    );
+    const assistantMsg: CounselMessage = {
+      id: `a-${Date.now() + 1}`,
+      role: "assistant",
+      content: replyText,
+      timestamp: nowLabel,
+    };
 
-    try {
-      const hasProfileData = Boolean(willProfile.fullName.trim());
-      const res = await fetch("/api/estate/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
-          willContext: includeProfileContext && hasProfileData ? willProfile : null,
-          tier: subscription.tierId,
-        }),
-      });
-
-      const data = (await res.json()) as { reply?: string; error?: string };
-      if (!res.ok) {
-        throw new Error(data.error || "Unable to reach Estate Counsel right now.");
-      }
-
-      const assistantMsg: CounselMessage = {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content: data.reply || "No response received.",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-
-      onAddMessages([assistantMsg]);
-      onIncrementQueryUsage();
-    } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Failed to connect to Estate Counsel."
-      );
-    } finally {
-      setIsLoading(false);
-    }
+    onAddMessages([userMsg, assistantMsg]);
+    onIncrementQueryUsage();
+    setIsLoading(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -5,6 +5,8 @@ import { AppView, BillingCycle, MembershipTierId } from "../types/estate";
 
 interface OverviewPageProps {
   currentTierId: MembershipTierId;
+  showVideo: boolean;
+  onMainCtaClick: () => void;
   onNavigate: (view: AppView) => void;
   onSelectPlan: (tierId: MembershipTierId, cycle: BillingCycle) => void;
   onLoadSampleAndOpenBuilder: () => void;
@@ -39,6 +41,8 @@ const CORE_PLAN_POINTS: Record<MembershipTierId, string[]> = {
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({
   currentTierId,
+  showVideo,
+  onMainCtaClick,
   onNavigate,
   onSelectPlan,
   onLoadSampleAndOpenBuilder,
@@ -49,10 +53,14 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
 
   return (
     <div className="bg-[#F8F9FA]">
-      {/* 1. Focused Hero Split */}
+      {/* 1. Focused Hero — Identical in A & B except the video element shown only in B */}
       <section className="max-w-[1400px] mx-auto px-6 lg:px-10 pt-10 pb-14 lg:pt-14 lg:pb-16">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
-          <div className="lg:col-span-6 flex flex-col justify-center">
+          <div
+            className={`${
+              showVideo ? "lg:col-span-6" : "lg:col-span-8"
+            } flex flex-col justify-center`}
+          >
             <p className="text-xs font-medium text-[#475569] mb-3">
               Singapore Wills Act (Cap. 352) Aligned
             </p>
@@ -73,7 +81,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             <div className="flex flex-wrap items-center gap-5 mt-8">
               <button
                 type="button"
-                onClick={() => onNavigate("builder")}
+                onClick={onMainCtaClick}
                 className="animate-cta-flash inline-flex items-center gap-2 px-6 py-3.5 text-sm font-semibold text-white bg-[#1D4ED8] hover:bg-[#1E40AF] rounded-md shadow-md shadow-[#1D4ED8]/25 transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1D4ED8]"
               >
                 Build your will NOW for FREE!
@@ -89,52 +97,54 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             </div>
           </div>
 
-          <div className="lg:col-span-6 flex items-center">
-            <div className="w-full aspect-video rounded-lg overflow-hidden border border-[#E2E8F0] bg-[#111827] relative shadow-sm">
-              {isPlayingVideo ? (
-                <iframe
-                  className="w-full h-full"
-                  src={YOUTUBE_EMBED_URL}
-                  title="YouTube video player"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsPlayingVideo(true)}
-                  aria-label="Play estate planning overview video"
-                  className="w-full h-full relative block group cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F4C3A]"
-                >
-                  <img
-                    src={THUMBNAIL_SOURCES[thumbIndex]}
-                    alt="Video preview thumbnail for Singapore Will Planning Overview"
-                    referrerPolicy="no-referrer"
-                    onError={() => {
-                      if (thumbIndex < THUMBNAIL_SOURCES.length - 1) {
-                        setThumbIndex((i) => i + 1);
-                      }
-                    }}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          {showVideo && (
+            <div className="lg:col-span-6 flex items-center">
+              <div className="w-full aspect-video rounded-lg overflow-hidden border border-[#E2E8F0] bg-[#111827] relative shadow-sm">
+                {isPlayingVideo ? (
+                  <iframe
+                    className="w-full h-full"
+                    src={YOUTUBE_EMBED_URL}
+                    title="YouTube video player"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
                   />
-                  <div
-                    aria-hidden="true"
-                    className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10 transition-opacity duration-200 group-hover:via-black/20"
-                  />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6">
-                    <span className="w-16 h-16 rounded-full bg-white text-[#111827] group-hover:bg-[#1D4ED8] group-hover:text-white flex items-center justify-center shadow-lg transition-colors duration-150">
-                      <Play className="w-6 h-6 fill-current ml-0.5" />
-                    </span>
-                    <span className="text-sm font-medium text-white tracking-tight">
-                      Watch Video Overview
-                    </span>
-                  </div>
-                </button>
-              )}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsPlayingVideo(true)}
+                    aria-label="Play estate planning overview video"
+                    className="w-full h-full relative block group cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F4C3A]"
+                  >
+                    <img
+                      src={THUMBNAIL_SOURCES[thumbIndex]}
+                      alt="Video preview thumbnail for Singapore Will Planning Overview"
+                      referrerPolicy="no-referrer"
+                      onError={() => {
+                        if (thumbIndex < THUMBNAIL_SOURCES.length - 1) {
+                          setThumbIndex((i) => i + 1);
+                        }
+                      }}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10 transition-opacity duration-200 group-hover:via-black/20"
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6">
+                      <span className="w-16 h-16 rounded-full bg-white text-[#111827] group-hover:bg-[#1D4ED8] group-hover:text-white flex items-center justify-center shadow-lg transition-colors duration-150">
+                        <Play className="w-6 h-6 fill-current ml-0.5" />
+                      </span>
+                      <span className="text-sm font-medium text-white tracking-tight">
+                        Watch Video Overview
+                      </span>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Minimal 3-Tool Quick Strip */}

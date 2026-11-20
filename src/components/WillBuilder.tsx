@@ -20,6 +20,10 @@ import {
   SubscriptionState,
   WillProfile,
 } from "../types/estate";
+import {
+  generateSingaporeWillClient,
+  reviewWillDraftClient,
+} from "../utils/clientEstateEngine";
 
 interface WillBuilderProps {
   profile: WillProfile;
@@ -129,7 +133,7 @@ export const WillBuilder: React.FC<WillBuilderProps> = ({
     ]);
   };
 
-  const handleGenerateWill = async () => {
+  const handleGenerateWill = () => {
     if (!profile.fullName.trim() || !profile.primaryExecutorName.trim()) {
       setApiError("Please provide at least your Full Legal Name (Step 1) and Primary Executor (Step 2).");
       return;
@@ -140,96 +144,39 @@ export const WillBuilder: React.FC<WillBuilderProps> = ({
     }
     if (isAtRevisionLimit) {
       setApiError(
-        `Essential tier includes up to ${revLimit} AI will drafts. Upgrade to Family Guard for unlimited revisions.`
+        `Essential tier includes up to ${revLimit} will drafts. Upgrade to Family Guard for unlimited revisions.`
       );
       return;
     }
 
     setApiError(null);
     setIsGenerating(true);
-
-    try {
-      const res = await fetch("/api/will/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile,
-          tier: subscription.tierId,
-        }),
-      });
-      const data = (await res.json()) as Partial<GeneratedWillResult> & { error?: string };
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to draft Will.");
-      }
-
-      const nextVersion = (generatedWill?.version ?? 0) + 1;
-      onSetGeneratedWill({
-        documentTitle: data.documentTitle || `LAST WILL AND TESTAMENT OF ${profile.fullName.toUpperCase()}`,
-        formalWillText: data.formalWillText || "",
-        summaryClauses: data.summaryClauses || [],
-        complianceNotices: data.complianceNotices || [],
-        generatedAt: new Date().toLocaleString("en-SG", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        version: nextVersion,
-      });
-      onSetAuditResult(null);
-      onIncrementWillGeneration();
-      setStep(6);
-      setRightTab("document");
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Error drafting will.");
-    } finally {
-      setIsGenerating(false);
-    }
+    const nextVersion = (generatedWill?.version ?? 0) + 1;
+    const drafted = generateSingaporeWillClient(profile, subscription.tierId, nextVersion);
+    onSetGeneratedWill(drafted);
+    onSetAuditResult(null);
+    onIncrementWillGeneration();
+    setStep(6);
+    setRightTab("document");
+    setIsGenerating(false);
   };
 
-  const handleRunRiskAudit = async () => {
+  const handleRunRiskAudit = () => {
     if (!plan.limits.includesRiskAudit) {
       onPromptUpgrade("family_guard", "annual");
       return;
     }
     if (!generatedWill?.formalWillText) {
-      setApiError("Generate a Will draft first before running the AI Risk & Ambiguity Audit.");
+      setApiError("Generate a Will draft first before running the Risk & Ambiguity Audit.");
       return;
     }
 
     setApiError(null);
     setIsAuditing(true);
     setRightTab("audit");
-
-    try {
-      const res = await fetch("/api/will/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          willText: generatedWill.formalWillText,
-          profile,
-        }),
-      });
-      const data = (await res.json()) as {
-        overallAssessment?: string;
-        findings?: AuditFinding[];
-        error?: string;
-      };
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to audit draft.");
-      }
-
-      onSetAuditResult({
-        overallAssessment: data.overallAssessment || "",
-        findings: data.findings || [],
-        auditedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Error running audit.");
-    } finally {
-      setIsAuditing(false);
-    }
+    const reviewed = reviewWillDraftClient(profile);
+    onSetAuditResult(reviewed);
+    setIsAuditing(false);
   };
 
   const handleApplySuggestedClause = (finding: AuditFinding) => {
